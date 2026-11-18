@@ -1,1 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voo nas Nuvens</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            color: white;
+        }
+        canvas {
+            background: linear-gradient(to bottom, #4facfe, #00f2fe);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
 
+    <canvas id="gameCanvas" width="480" height="640"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Variáveis do Jogo
+        let score = 0;
+        let isGameOver = false;
+
+        // Jogador (Aviãozinho / Personagem)
+        const player = {
+            x: 100,
+            y: canvas.height / 2,
+            width: 40,
+            height: 25,
+            speedY: 0,
+            gravity: 0.5,
+            lift: -8
+        };
+
+        // Obstáculos (Pássaros)
+        let birds = [];
+        let frameCount = 0;
+
+        // Controles (Espaço ou clique do mouse para voar para cima)
+        window.addEventListener("keydown", function(e) {
+            if (e.code === "Space") {
+                player.speedY = player.lift;
+                if (isGameOver) resetGame();
+            }
+        });
+
+        canvas.addEventListener("click", function() {
+            player.speedY = player.lift;
+            if (isGameOver) resetGame();
+        });
+
+        function resetGame() {
+            player.y = canvas.height / 2;
+            player.speedY = 0;
+            birds = [];
+            score = 0;
+            frameCount = 0;
+            isGameOver = false;
+            loop();
+        }
+
+        // Criar novos pássaros
+        function spawnBird() {
+            const minHeight = 50;
+            const maxHeight = canvas.height - 100;
+            const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+            
+            birds.push({
+                x: canvas.width,
+                y: height,
+                width: 35,
+                height: 25,
+                speed: 4 + Math.random() * 2 // Velocidade variável
+            });
+        }
+
+        // Atualizar posições
+        function update() {
+            if (isGameOver) return;
+
+            // Gravidade e movimento do jogador
+            player.speedY += player.gravity;
+            player.y += player.speedY;
+
+            // Limites da tela (chão e teto)
+            if (player.y + player.height > canvas.height) {
+                player.y = canvas.height - player.height;
+                isGameOver = true;
+            }
+            if (player.y < 0) {
+                player.y = 0;
+                player.speedY = 0;
+            }
+
+            // Gerenciar Pássaros
+            if (frameCount % 90 === 0) { // Cria um pássaro a cada 90 quadros
+                spawnBird();
+            }
+
+            for (let i = birds.length - 1; i >= 0; i--) {
+                birds[i].x -= birds[i].speed;
+
+                // Colisão com o jogador
+                if (
+                    player.x < birds[i].x + birds[i].width &&
+                    player.x + player.width > birds[i].x &&
+                    player.y < birds[i].y + birds[i].height &&
+                    player.y + player.height > birds[i].y
+                ) {
+                    isGameOver = true;
+                }
+
+                // Remover pássaros que saíram da tela e somar pontos
+                if (birds[i].x + birds[i].width < 0) {
+                    birds.splice(i, 1);
+                    score += 10;
+                }
+            }
+
+            frameCount++;
+        }
+
+        // Desenhar elementos na tela
+        function draw() {
+            // Limpar tela
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Desenhar Jogador (Avião / Personagem simples)
+            ctx.fillStyle = "#ffcc00";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            // Detalhe da asa
+            ctx.fillStyle = "#ff4444";
+            ctx.fillRect(player.x + 10, player.y - 5, 15, 8);
+
+            // Desenhar Pássaros
+            ctx.fillStyle = "#333333";
+            for (let i = 0; i < birds.length; i++) {
+                ctx.fillRect(birds[i].x, birds[i].y, birds[i].width, birds[i].height);
+            }
+
+            // Placar
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText("Pontos: " + score, 20, 35);
+
+            // Tela de Game Over
+            if (isGameOver) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = "white";
+                ctx.font = "30px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("FIM DE JOGO", canvas.width / 2, canvas.height / 2 - 20);
+                
+                ctx.font = "16px Arial";
+                ctx.fillText("Clique ou aperte Espaço para Reiniciar", canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = "left"; // Reseta o alinhamento
+            }
+        }
+
+        // Loop principal do jogo
+        function loop() {
+            update();
+            draw();
+            if (!isGameOver) {
+                requestAnimationFrame(loop);
+            }
+        }
+
+        // Iniciar o jogo pela primeira vez
+        loop();
+    </script>
+</body>
+</html>
