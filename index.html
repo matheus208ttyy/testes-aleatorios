@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Caça aos Patos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    body { background: #141824; color: #f4f6fb; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; min-height: 100dvh; padding: 16px; touch-action: manipulation; }
+    .hud { width: 100%; max-width: 900px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: #1e2536; padding: 10px 16px; border-radius: 12px 12px 0 0; border: 1px solid #2e3852; border-bottom: none; }
+    .stats { display: flex; flex-wrap: wrap; gap: 14px; font-weight: 700; font-size: .95rem; }
+    .stats b { color: #ffd166; font-size: 1.1rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+    button { background: #2b3550; color: #fff; border: 1px solid #44537a; padding: 7px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background .15s, transform .1s; }
+    button:hover:not(:disabled) { background: #39476b; }
+    button:active:not(:disabled) { transform: scale(.97); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button.active { background: #06d6a0; color: #0b1915; border-color: #06d6a0; }
+    .game-wrapper { position: relative; width: 100%; max-width: 900px; aspect-ratio: 900 / 562; border: 1px solid #2e3852; border-radius: 0 0 12px 12px; overflow: hidden; background: #87ceeb; touch-action: none; }
+    .game-wrapper.aiming { cursor: none; }
+    canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    .overlay { position: absolute; inset: 0; background: rgba(12, 16, 26, .3); display: flex; overflow-y: auto; padding: 12px; }
+    .overlay.hidden { display: none; }
+    .panel { margin: auto; background: rgba(12, 16, 26, .82); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); border: 1px solid #2e3852; border-radius: 14px; padding: 22px 26px; text-align: center; width: 100%; max-width: 560px; }
+    .panel.hidden { display: none; }
+    .panel h1 { font-size: 2rem; margin-bottom: 8px; color: #ffd166; }
+    .panel h2 { font-size: 1.4rem; color: #ffd166; margin-bottom: 4px; }
+    .panel p { line-height: 1.5; color: #d6deef; margin-bottom: 14px; }
+    .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .start-btn { background: #06d6a0; color: #091713; border: none; padding: 12px 26px; font-size: 1.05rem; border-radius: 10px; }
+    .start-btn:hover:not(:disabled) { background: #1ef0b8; }
+    .shop-btn { padding: 12px 22px; font-size: 1.05rem; border-radius: 10px; }
+    .shop { display: grid; gap: 8px; margin: 12px 0; text-align: left; }
+    .up { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #1e2536; border: 1px solid #2e3852; border-radius: 10px; padding: 8px 12px; }
+    .up small { color: #9aa7c2; display: block; }
+    .up .lv { color: #06d6a0; font-weight: 700; }
+    .tip { margin-top: 10px; font-size: .85rem; color: #9aa7c2; text-align: center; }
+    @media (max-width: 600px) {
+      .panel { padding: 12px; }
+      .panel h1 { font-size: 1.4rem; }
+      .panel p { font-size: .85rem; margin-bottom: 10px; }
+      .up { padding: 5px 8px; font-size: .85rem; }
+      .shop { gap: 5px; margin: 8px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div class="stats">
+      <span>Pontos: <b id="score">0</b></span>
+      <span>Recorde: <b id="bestScore">0</b></span>
+      <span>Tempo: <b id="time">45</b>s</span>
+      <span>Combo: <b id="combo">x1</b></span>
+      <span>Moedas: <b id="coins">0</b></span>
+    </div>
+    <div class="controls">
+      <button data-mode="all" class="active">Céu e Chão</button>
+      <button data-mode="sky">Só Céu</button>
+      <button data-mode="ground">Só Chão</button>
+      <button id="restartBtn">Reiniciar</button>
+    </div>
+  </div>
+
+  <div class="game-wrapper" id="gameWrapper">
+    <canvas id="gameCanvas" width="900" height="562"></canvas>
+
+    <div class="overlay" id="overlay">
+      <div class="panel" id="menuView">
+        <h1 id="overlayTitle">🦆 Caça aos Patos</h1>
+        <p id="overlayText">Clique ou toque nos patos no <b>céu</b> ou no <b>chão</b> antes que o tempo acabe. Patos dourados valem mais! Os pontos viram <b>moedas</b> para melhorar sua arma.</p>
+        <div class="row">
+          <button class="start-btn" id="startBtn">Começar Jogo</button>
+          <button class="shop-btn" id="shopBtn">🔫 Loja de Armas</button>
+        </div>
+      </div>
+
+      <div class="panel hidden" id="shopView">
+        <h2>Loja de Armas</h2>
+        <p style="margin:0">Arma: <b id="weaponName"></b> · Moedas: <b id="shopCoins" style="color:#ffd166"></b></p>
+        <div class="shop" id="shopList"></div>
+        <button id="backBtn">← Voltar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip">Errar o tiro zera o combo. Suas moedas e upgrades ficam salvos no navegador.</div>
+
+  <script>
+    const KEY_BEST = "caca_patos_best_v1", KEY_BANK = "caca_patos_bank_v1", KEY_UP = "caca_patos_upgrades_v1";
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const $ = (id) => document.getElementById(id);
+    const gameWrapper = $("gameWrapper"), overlay = $("overlay");
+    const menuView = $("menuView"), shopView = $("shopView");
+    const modeButtons = document.querySelectorAll("[data-mode]");
+
+    const BASE_DURATION = 45;
+    const HORIZON_Y = 390;
+
+    // ---------- Upgrades ----------
+    const UPGRADES = [
+      { id: "calibre", name: "Calibre", max: 5, base: 500, desc: (l) => `Área de acerto +${l * 6}px` },
+      { id: "polvora", name: "Pólvora", max: 5, base: 800, desc: (l) => `+${l * 12}% de pontos` },
+      { id: "relogio", name: "Relógio", max: 5, base: 700, desc: (l) => `+${l * 4}s de tempo` },
+      { id: "mira", name: "Mira Estável", max: 2, base: 1500, desc: (l) => `Combo sobe a cada ${3 - l} acertos` }
+    ];
+    const WEAPONS = ["Espingarda Velha", "Espingarda de Caça", "Calibre 12", "Escopeta Pro", "Rifle de Elite", "Arma Lendária"];
+
+    function load(key, fallback) {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (_) { return fallback; }
+    }
+    function save(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* storage bloqueado */ }
+    }
+
+    let bestScore = Number(load(KEY_BEST, 0)) || 0;
+    let bank = Number(load(KEY_BANK, 0)) || 0;
+    let levels = Object.assign({ calibre: 0, polvora: 0, relogio: 0, mira: 0 }, load(KEY_UP, {}));
+
+    const lvl = (id) => levels[id] || 0;
+    const upgradeCost = (u) => Math.round((u.base * Math.pow(1.8, lvl(u.id))) / 10) * 10;
+    const weaponName = () => WEAPONS[Math.min(WEAPONS.length - 1, Math.floor(UPGRADES.reduce((s, u) => s + lvl(u.id), 0) / 3))];
+
+    function renderShop() {
+      $("weaponName").textContent = weaponName();
+      $("shopCoins").textContent = bank;
+      $("shopList").innerHTML = UPGRADES.map((u) => {
+        const l = lvl(u.id), maxed = l >= u.max, cost = upgradeCost(u);
+        return `<div class="up">
+          <div><b>${u.name}</b> <span class="lv">Nv ${l}/${u.max}</span>
+            <small>${l > 0 ? u.desc(l) : "Sem bônus ainda"}${maxed ? "" : " → " + u.desc(l + 1)}</small></div>
+          <button data-buy="${u.id}" ${maxed || bank < cost ? "disabled" : ""}>${maxed ? "MÁX" : "🪙 " + cost}</button>
+        </div>`;
+      }).join("");
+    }
+
+    $("shopList").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-buy]");
+      if (!btn) return;
+      const u = UPGRADES.find((x) => x.id === btn.dataset.buy);
+      if (!u) return;
+      const cost = upgradeCost(u);
+      if (lvl(u.id) >= u.max || bank < cost) return;
+      bank -= cost;
+      levels[u.id] = lvl(u.id) + 1;
+      save(KEY_BANK, bank);
+      save(KEY_UP, levels);
+      renderShop();
+      updateHud();
+    });
+
+    function showView(name) {
+      menuView.classList.toggle("hidden", name !== "menu");
+      shopView.classList.toggle("hidden", name !== "shop");
+      if (name === "shop") renderShop();
+    }
+    $("shopBtn").addEventListener("click", () => showView("shop"));
+    $("backBtn").addEventListener("click", () => showView("menu"));
+
+    // ---------- Estado do jogo ----------
+    let score = 0, bestAtStart = bestScore, duration = BASE_DURATION, timeLeft = BASE_DURATION;
+    let combo = 1, maxCombo = 1, streak = 0;
+    let spawnMode = "all", isRunning = false;
+    let lastTimestamp = 0, spawnTimer = 0, countdownTimer = 0;
+    let ducks = [], feathers = [], popups = [];
+    const clouds = [
+      { x: 120, y: 85, scale: 1.0, speed: 14 },
+      { x: 460, y: 130, scale: 0.75, speed: 9 },
+      { x: 760, y: 70, scale: 1.15, speed: 17 }
+    ];
+    const pointer = { x: canvas.width / 2, y: canvas.height / 2, showCrosshair: false, recoil: 0 };
+
+    function syncCursorState() {
+      gameWrapper.classList.toggle("aiming", isRunning && pointer.showCrosshair);
+    }
+
+    modeButtons.forEach((btn) => btn.addEventListener("click", () => {
+      spawnMode = btn.dataset.mode;
+      modeButtons.forEach((b) => b.classList.toggle("active", b === btn));
+    }));
+
+    function updateHud() {
+      $("score").textContent = score;
+      $("bestScore").textContent = bestScore;
+      $("time").textContent = Math.max(0, Math.ceil(timeLeft));
+      $("combo").textContent = `x${combo}`;
+      $("coins").textContent = bank;
+    }
+
+    function startGame() {
+      score = 0;
+      bestAtStart = bestScore;
+      duration = BASE_DURATION + lvl("relogio") * 4;
+      timeLeft = duration;
+      combo = 1; maxCombo = 1; streak = 0;
+      ducks = []; feathers = []; popups = [];
+      spawnTimer = 0.2;
+      countdownTimer = 0;
+      isRunning = true;
+      lastTimestamp = performance.now();
+      overlay.classList.add("hidden");
+      syncCursorState();
+      updateHud();
+    }
+
+    function endGame() {
+      isRunning = false;
+      syncCursorState();
+      bank += score;
+      save(KEY_BANK, bank);
+      if (score > bestScore) { bestScore = score; save(KEY_BEST, bestScore); }
+      updateHud();
+      const newRecord = score > bestAtStart;
+      $("overlayTitle").textContent = newRecord ? "Novo Recorde! 🎉" : "Tempo Esgotado!";
+      $("overlayText").innerHTML =
+        `Você fez <b>${score} pontos</b> (Recorde: <b>${bestScore}</b>), combo máximo <b>x${maxCombo}</b>.<br/>` +
+        `<b>+${score} moedas</b> na carteira! Gaste na Loja de Armas ou jogue de novo.`;
+      $("startBtn").textContent = "Jogar Novamente";
+      showView("menu");
+      overlay.classList.remove("hidden");
+    }
+
+    $("startBtn").addEventListener("click", startGame);
+    $("restartBtn").addEventListener("click", startGame);
+
+    // ---------- Patos ----------
+    function spawnDuck(mode) {
+      let zone = mode;
+      if (zone === "all") zone = Math.random() < 0.55 ? "sky" : "ground";
+      const fromLeft = Math.random() < 0.5;
+      const isGolden = Math.random() < 0.14;
+
+      if (zone === "sky") {
+        const y = 55 + Math.random() * (HORIZON_Y - 115);
+        const speed = (130 + Math.random() * 110) * (isGolden ? 1.25 : 1);
+        ducks.push({
+          zone, x: fromLeft ? -40 : canvas.width + 40, y,
+          vx: fromLeft ? speed : -speed, vy: (Math.random() - 0.5) * 28,
+          radius: isGolden ? 22 : 25, wingPhase: Math.random() * 6.28,
+          isGolden, points: isGolden ? 250 : 120
+        });
+      } else {
+        const y = HORIZON_Y + 35 + Math.random() * (canvas.height - HORIZON_Y - 65);
+        const speed = (45 + Math.random() * 55) * (isGolden ? 1.3 : 1);
+        ducks.push({
+          zone, baseY: y, x: fromLeft ? -35 : canvas.width + 35, y,
+          vx: fromLeft ? speed : -speed, vy: 0, hopTimer: Math.random() * 2,
+          radius: isGolden ? 21 : 24, wingPhase: Math.random() * 6.28,
+          isGolden, points: isGolden ? 200 : 100
+        });
+      }
+    }
+
+    function createHitEffect(x, y, pts, isGolden) {
+      const count = isGolden ? 16 : 10;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 50 + Math.random() * 160;
+        feathers.push({
+          x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 40,
+          size: 4 + Math.random() * 5, rot: Math.random() * 6.28, vRot: (Math.random() - 0.5) * 10, alpha: 1,
+          color: isGolden ? "#ffd166" : i % 2 === 0 ? "#dce3f0" : "#7a8599"
+        });
+      }
+      popups.push({ x, y: y - 10, text: `+${pts}${isGolden ? " ★" : ""}`, alpha: 1, color: isGolden ? "#ffd166" : "#06d6a0" });
+    }
+
+    // ---------- Entrada ----------
+    function getCanvasCoords(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+        y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("pointermove", (e) => {
+      const pos = getCanvasCoords(e);
+      pointer.x = pos.x; pointer.y = pos.y;
+      pointer.showCrosshair = e.pointerType === "mouse";
+      syncCursorState();
+    });
+    canvas.addEventListener("pointerleave", () => { pointer.showCrosshair = false; syncCursorState(); });
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!isRunning || (e.pointerType === "mouse" && e.button !== 0)) return;
+      e.preventDefault();
+      const pos = getCanvasCoords(e);
+      pointer.x = pos.x; pointer.y = pos.y;
+      pointer.showCrosshair = e.pointerType === "mouse";
+      pointer.recoil = 1;
+      syncCursorState();
+
+      const hitPadding = (e.pointerType === "touch" ? 16 : 8) + lvl("calibre") * 6;
+      let hitIndex = -1, bestDist = Infinity;
+      for (let i = 0; i < ducks.length; i++) {
+        const d = ducks[i];
+        const dist = Math.hypot(pos.x - d.x, pos.y - d.y);
+        if (dist <= d.radius + hitPadding && dist < bestDist) { bestDist = dist; hitIndex = i; }
+      }
+
+      if (hitIndex !== -1) {
+        const hit = ducks.splice(hitIndex, 1)[0];
+        streak += 1;
+        combo = Math.min(8, 1 + Math.floor(streak / (3 - lvl("mira"))));
+        maxCombo = Math.max(maxCombo, combo);
+        const earned = Math.round(hit.points * combo * (1 + lvl("polvora") * 0.12));
+        score += earned;
+        if (score > bestScore) { bestScore = score; save(KEY_BEST, bestScore); }
+        createHitEffect(hit.x, hit.y, earned, hit.isGolden);
+      } else {
+        streak = 0;
+        combo = 1;
+        popups.push({ x: pos.x, y: pos.y - 8, text: "ERROU!", alpha: 0.9, color: "#ef476f" });
+      }
+      updateHud();
+    });
+
+    // ---------- Atualização ----------
+    function update(dt) {
+      for (const c of clouds) {
+        c.x += c.speed * dt;
+        if (c.x - 90 > canvas.width) c.x = -90;
+      }
+      for (let i = feathers.length - 1; i >= 0; i--) {
+        const f = feathers[i];
+        f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 240 * dt; f.rot += f.vRot * dt; f.alpha -= dt * 1.1;
+        if (f.alpha <= 0) feathers.splice(i, 1);
+      }
+      for (let i = popups.length - 1; i >= 0; i--) {
+        const p = popups[i];
+        p.y -= 42 * dt; p.alpha -= dt * 1.25;
+        if (p.alpha <= 0) popups.splice(i, 1);
+      }
+      if (pointer.recoil > 0) pointer.recoil = Math.max(0, pointer.recoil - dt * 6);
+
+      spawnTimer -= dt;
+      if (isRunning) {
+        timeLeft -= dt;
+        countdownTimer += dt;
+        if (countdownTimer >= 0.1) { countdownTimer = 0; updateHud(); }
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          endGame();
+        } else if (spawnTimer <= 0) {
+          spawnDuck(spawnMode);
+          spawnTimer = 0.42 + Math.max(0.35, timeLeft / duration) * 0.55;
+        }
+      } else if (spawnTimer <= 0) {
+        // Tela inicial: vários patos passando
+        spawnDuck("all");
+        spawnTimer = 0.35;
+      }
+
+      for (let i = ducks.length - 1; i >= 0; i--) {
+        const d = ducks[i];
+        d.x += d.vx * dt;
+        if (d.zone === "sky") {
+          d.y += d.vy * dt;
+          if (d.y < 45) { d.y = 45; d.vy = Math.abs(d.vy); }
+          if (d.y > HORIZON_Y - 25) { d.y = HORIZON_Y - 25; d.vy = -Math.abs(d.vy); }
+          d.wingPhase += dt * 15;
+        } else {
+          d.hopTimer += dt * 5.5;
+          d.y = d.baseY - Math.max(0, Math.sin(d.hopTimer)) * 12;
+          d.wingPhase += dt * 4;
+        }
+        if ((d.vx > 0 && d.x > canvas.width + 70) || (d.vx < 0 && d.x < -70)) ducks.splice(i, 1);
+      }
+    }
+
+    // ---------- Desenho ----------
+    function drawBackground() {
+      const sky = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+      sky.addColorStop(0, "#3a86ff");
+      sky.addColorStop(1, "#bde0fe");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, canvas.width, HORIZON_Y);
+
+      ctx.fillStyle = "rgba(255, 243, 176, 0.9)";
+      ctx.beginPath(); ctx.arc(760, 85, 36, 0, Math.PI * 2); ctx.fill();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      for (const c of clouds) {
+        ctx.save();
+        ctx.translate(c.x, c.y); ctx.scale(c.scale, c.scale);
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.arc(22, -6, 28, 0, Math.PI * 2); ctx.arc(46, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const ground = ctx.createLinearGradient(0, HORIZON_Y, 0, canvas.height);
+      ground.addColorStop(0, "#52b788");
+      ground.addColorStop(1, "#2d6a4f");
+      ctx.fillStyle = ground;
+      ctx.fillRect(0, HORIZON_Y, canvas.width, canvas.height - HORIZON_Y);
+
+      ctx.strokeStyle = "#40916c"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, HORIZON_Y); ctx.lineTo(canvas.width, HORIZON_Y); ctx.stroke();
+    }
+
+    function drawDuck(d) {
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      if (d.vx < 0) ctx.scale(-1, 1);
+
+      if (d.zone === "ground") {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.beginPath(); ctx.ellipse(0, d.baseY - d.y + 14, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
+      }
+
+      const g = d.isGolden;
+      const body = g ? "#ffd166" : "#a79c8c";
+      const chest = g ? "#f4a261" : "#8b4f2a";
+      const head = g ? "#ffe29a" : "#1b8a4b";
+      const wing = g ? "#f4a261" : "#6b5f50";
+
+      // cauda
+      ctx.fillStyle = wing;
+      ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-27, -7); ctx.lineTo(-24, 6); ctx.closePath(); ctx.fill();
+
+      // corpo e peito
+      ctx.fillStyle = body;
+      ctx.beginPath(); ctx.ellipse(0, 3, 18, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = chest;
+      ctx.beginPath(); ctx.ellipse(9, 5, 9, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+      // pescoço, anel branco e cabeça
+      ctx.fillStyle = head;
+      ctx.beginPath(); ctx.ellipse(11, -3, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(14, -10, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(6, -1, 11, 2.5);
+
+      // bico e olho
+      ctx.fillStyle = "#f2c230";
+      ctx.beginPath(); ctx.ellipse(24, -8, 7, 2.8, 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#111";
+      ctx.beginPath(); ctx.arc(16, -12, 1.8, 0, Math.PI * 2); ctx.fill();
+
+      // asa batendo
+      const flap = Math.sin(d.wingPhase) * 12;
+      ctx.fillStyle = wing;
+      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.quadraticCurveTo(0, -18 + flap, 10, 2); ctx.closePath(); ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawCrosshair() {
+      if (!pointer.showCrosshair || !isRunning) return;
+      const spread = 14 + lvl("calibre") * 3 + pointer.recoil * 8;
+      ctx.save();
+      ctx.translate(pointer.x, pointer.y);
+      ctx.strokeStyle = "#ff2a55"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, spread, 0, Math.PI * 2); ctx.stroke();
+      const len = 7;
+      ctx.beginPath();
+      ctx.moveTo(-spread - len, 0); ctx.lineTo(-spread + 3, 0);
+      ctx.moveTo(spread - 3, 0); ctx.lineTo(spread + len, 0);
+      ctx.moveTo(0, -spread - len); ctx.lineTo(0, -spread + 3);
+      ctx.moveTo(0, spread - 3); ctx.lineTo(0, spread + len);
+      ctx.stroke();
+      ctx.fillStyle = "#ff2a55";
+      ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawEffects() {
+      for (const f of feathers) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, f.alpha);
+        ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+        ctx.fillStyle = f.color;
+        ctx.beginPath(); ctx.ellipse(0, 0, f.size, f.size * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      for (const p of popups) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.font = "bold 16px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.restore();
+      }
+    }
+
+    function render() {
+      drawBackground();
+      for (const d of [...ducks].sort((a, b) => a.y - b.y)) drawDuck(d);
+      drawEffects();
+      drawCrosshair();
+    }
+
+    function loop(timestamp) {
+      const dt = Math.min(0.05, Math.max(0, (timestamp - lastTimestamp) / 1000));
+      lastTimestamp = timestamp;
+      update(dt);
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    updateHud();
+    lastTimestamp = performance.now();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
