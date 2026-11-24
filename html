@@ -1,190 +1,708 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voo nas Nuvens</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #1a1a2e;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-            color: white;
-        }
-        canvas {
-            background: linear-gradient(to bottom, #4facfe, #00f2fe);
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            cursor: pointer;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Caça aos Pombos - Céu e Chão</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #141824;
+      color: #f4f6fb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .hud {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #1e2536;
+      padding: 12px 18px;
+      border-radius: 12px 12px 0 0;
+      border: 1px solid #2e3852;
+      border-bottom: none;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .stats span b {
+      color: #ffd166;
+      font-size: 1.15rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      background: #2b3550;
+      color: #fff;
+      border: 1px solid #44537a;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    button:hover {
+      background: #39476b;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button.active {
+      background: #06d6a0;
+      color: #0b1915;
+      border-color: #06d6a0;
+    }
+
+    .game-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      aspect-ratio: 16 / 10;
+      border: 1px solid #2e3852;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+      background: #87ceeb;
+      touch-action: none;
+    }
+
+    .game-wrapper.aiming {
+      cursor: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(12, 16, 26, 0.78);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      cursor: default;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .overlay h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      color: #ffd166;
+    }
+
+    .overlay p {
+      max-width: 520px;
+      line-height: 1.5;
+      color: #d6deef;
+      margin-bottom: 20px;
+    }
+
+    .start-btn {
+      background: #06d6a0;
+      color: #091713;
+      border: none;
+      padding: 12px 26px;
+      font-size: 1.05rem;
+      border-radius: 10px;
+    }
+
+    .start-btn:hover {
+      background: #1ef0b8;
+    }
+
+    .tip {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: #9aa7c2;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
+  <div class="hud">
+    <div class="stats">
+      <span>Pontos: <b id="score">0</b></span>
+      <span>Recorde: <b id="bestScore">0</b></span>
+      <span>Tempo: <b id="time">45</b>s</span>
+      <span>Combo: <b id="combo">x1</b></span>
+    </div>
+    <div class="controls">
+      <button id="modeAll" class="active" data-mode="all">Céu e Chão</button>
+      <button id="modeSky" data-mode="sky">Só Céu</button>
+      <button id="modeGround" data-mode="ground">Só Chão</button>
+      <button id="restartBtn">Reiniciar</button>
+    </div>
+  </div>
 
-    <canvas id="gameCanvas" width="480" height="640"></canvas>
+  <div class="game-wrapper" id="gameWrapper">
+    <canvas id="gameCanvas" width="900" height="562"></canvas>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+    <div class="overlay" id="overlay">
+      <h1 id="overlayTitle">Caça aos Pombos</h1>
+      <p id="overlayText">
+        Clique ou toque nos pombos no <b>céu</b> ou no <b>chão</b> antes que o tempo acabe.<br />
+        Pombos dourados valem mais pontos e pombos no céu dão bônus de velocidade!
+      </p>
+      <button class="start-btn" id="startBtn">Começar Jogo</button>
+    </div>
+  </div>
 
-        // Variáveis do Jogo
-        let score = 0;
-        let isGameOver = false;
+  <div class="tip">
+    Pronto para GitHub Pages (salve como <b>index.html</b>). Errar o tiro zera o combo.
+  </div>
 
-        // Jogador (Aviãozinho / Personagem)
-        const player = {
-            x: 100,
-            y: canvas.height / 2,
-            width: 40,
-            height: 25,
-            speedY: 0,
-            gravity: 0.5,
-            lift: -8
-        };
+  <script>
+    const STORAGE_KEY = "caca_pombos_best_score_v1";
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const gameWrapper = document.getElementById("gameWrapper");
 
-        // Obstáculos (Pássaros)
-        let birds = [];
-        let frameCount = 0;
+    const scoreEl = document.getElementById("score");
+    const bestScoreEl = document.getElementById("bestScore");
+    const timeEl = document.getElementById("time");
+    const comboEl = document.getElementById("combo");
+    const overlay = document.getElementById("overlay");
+    const overlayTitle = document.getElementById("overlayTitle");
+    const overlayText = document.getElementById("overlayText");
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const modeButtons = document.querySelectorAll("[data-mode]");
 
-        // Controles (Espaço ou clique do mouse para voar para cima)
-        window.addEventListener("keydown", function(e) {
-            if (e.code === "Space") {
-                player.speedY = player.lift;
-                if (isGameOver) resetGame();
-            }
+    const GAME_DURATION = 45;
+    const HORIZON_Y = 390;
+
+    function loadBestScore() {
+      try {
+        return Number(localStorage.getItem(STORAGE_KEY) || "0") || 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    function saveBestScore(value) {
+      try {
+        localStorage.setItem(STORAGE_KEY, String(value));
+      } catch (_) {
+        // Ignora caso o navegador bloqueie storage
+      }
+    }
+
+    let score = 0;
+    let bestScore = loadBestScore();
+    let timeLeft = GAME_DURATION;
+    let combo = 1;
+    let streak = 0;
+    let spawnMode = "all";
+    let isRunning = false;
+    let lastTimestamp = 0;
+    let spawnTimer = 0;
+    let countdownTimer = 0;
+
+    let pigeons = [];
+    let feathers = [];
+    let popups = [];
+    let clouds = [
+      { x: 120, y: 85, scale: 1.0, speed: 14 },
+      { x: 460, y: 130, scale: 0.75, speed: 9 },
+      { x: 760, y: 70, scale: 1.15, speed: 17 }
+    ];
+
+    const pointer = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      showCrosshair: false,
+      recoil: 0
+    };
+
+    function syncCursorState() {
+      const shouldHide = isRunning && pointer.showCrosshair;
+      gameWrapper.classList.toggle("aiming", shouldHide);
+    }
+
+    function setMode(mode) {
+      spawnMode = mode;
+      modeButtons.forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.mode === mode);
+      });
+    }
+
+    modeButtons.forEach((btn) => {
+      btn.addEventListener("click", () => setMode(btn.dataset.mode));
+    });
+
+    function updateHud() {
+      scoreEl.textContent = score;
+      bestScoreEl.textContent = bestScore;
+      timeEl.textContent = Math.max(0, Math.ceil(timeLeft));
+      comboEl.textContent = `x${combo}`;
+    }
+
+    function startGame() {
+      score = 0;
+      timeLeft = GAME_DURATION;
+      combo = 1;
+      streak = 0;
+      pigeons = [];
+      feathers = [];
+      popups = [];
+      spawnTimer = 0.2;
+      countdownTimer = 0;
+      isRunning = true;
+      lastTimestamp = performance.now();
+      overlay.classList.add("hidden");
+      syncCursorState();
+      updateHud();
+    }
+
+    function endGame() {
+      isRunning = false;
+      syncCursorState();
+      if (score > bestScore) {
+        bestScore = score;
+        saveBestScore(bestScore);
+        updateHud();
+      }
+      overlayTitle.textContent = "Tempo Esgotado!";
+      overlayText.innerHTML = `Você fez <b>${score} pontos</b> (Recorde: <b>${bestScore}</b>) e combo máximo de <b>x${combo}</b>.<br/>Quer tentar bater seu recorde?`;
+      startBtn.textContent = "Jogar Novamente";
+      overlay.classList.remove("hidden");
+    }
+
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", startGame);
+
+    function spawnPigeon() {
+      let zone = spawnMode;
+      if (zone === "all") {
+        zone = Math.random() < 0.55 ? "sky" : "ground";
+      }
+
+      const fromLeft = Math.random() < 0.5;
+      const isGolden = Math.random() < 0.14;
+
+      if (zone === "sky") {
+        const y = 55 + Math.random() * (HORIZON_Y - 115);
+        const speed = (130 + Math.random() * 110) * (isGolden ? 1.25 : 1);
+        pigeons.push({
+          zone: "sky",
+          x: fromLeft ? -40 : canvas.width + 40,
+          y,
+          vx: fromLeft ? speed : -speed,
+          vy: (Math.random() - 0.5) * 28,
+          radius: isGolden ? 22 : 25,
+          wingPhase: Math.random() * Math.PI * 2,
+          isGolden,
+          points: isGolden ? 250 : 120
         });
-
-        canvas.addEventListener("click", function() {
-            player.speedY = player.lift;
-            if (isGameOver) resetGame();
+      } else {
+        const y = HORIZON_Y + 35 + Math.random() * (canvas.height - HORIZON_Y - 65);
+        const speed = (45 + Math.random() * 55) * (isGolden ? 1.3 : 1);
+        pigeons.push({
+          zone: "ground",
+          baseY: y,
+          x: fromLeft ? -35 : canvas.width + 35,
+          y,
+          vx: fromLeft ? speed : -speed,
+          vy: 0,
+          hopTimer: Math.random() * 2,
+          radius: isGolden ? 21 : 24,
+          wingPhase: Math.random() * Math.PI * 2,
+          isGolden,
+          points: isGolden ? 200 : 100
         });
+      }
+    }
 
-        function resetGame() {
-            player.y = canvas.height / 2;
-            player.speedY = 0;
-            birds = [];
-            score = 0;
-            frameCount = 0;
-            isGameOver = false;
-            loop();
+    function createHitEffect(x, y, pts, isGolden) {
+      const count = isGolden ? 16 : 10;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 50 + Math.random() * 160;
+        feathers.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 40,
+          size: 4 + Math.random() * 5,
+          rot: Math.random() * Math.PI * 2,
+          vRot: (Math.random() - 0.5) * 10,
+          alpha: 1,
+          color: isGolden ? "#ffd166" : i % 2 === 0 ? "#dce3f0" : "#7a8599"
+        });
+      }
+      popups.push({
+        x,
+        y: y - 10,
+        text: `+${pts}${isGolden ? " ★" : ""}`,
+        alpha: 1,
+        color: isGolden ? "#ffd166" : "#06d6a0"
+      });
+    }
+
+    function getCanvasCoords(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+      };
+    }
+
+    canvas.addEventListener("pointermove", (e) => {
+      const pos = getCanvasCoords(e);
+      pointer.x = pos.x;
+      pointer.y = pos.y;
+      pointer.showCrosshair = e.pointerType === "mouse";
+      syncCursorState();
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      pointer.showCrosshair = false;
+      syncCursorState();
+    });
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!isRunning || (e.pointerType === "mouse" && e.button !== 0)) return;
+      const pos = getCanvasCoords(e);
+      pointer.x = pos.x;
+      pointer.y = pos.y;
+      pointer.showCrosshair = e.pointerType === "mouse";
+      pointer.recoil = 1;
+      syncCursorState();
+
+      const hitPadding = e.pointerType === "touch" ? 16 : 8;
+      let hitIndex = -1;
+      for (let i = pigeons.length - 1; i >= 0; i--) {
+        const p = pigeons[i];
+        const dx = pos.x - p.x;
+        const dy = pos.y - p.y;
+        if (Math.hypot(dx, dy) <= p.radius + hitPadding) {
+          hitIndex = i;
+          break;
+        }
+      }
+
+      if (hitIndex !== -1) {
+        const hitPigeon = pigeons[hitIndex];
+        pigeons.splice(hitIndex, 1);
+
+        streak += 1;
+        combo = Math.min(8, 1 + Math.floor(streak / 3));
+        const earned = hitPigeon.points * combo;
+        score += earned;
+        if (score > bestScore) {
+          bestScore = score;
+          saveBestScore(bestScore);
         }
 
-        // Criar novos pássaros
-        function spawnBird() {
-            const minHeight = 50;
-            const maxHeight = canvas.height - 100;
-            const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
-            
-            birds.push({
-                x: canvas.width,
-                y: height,
-                width: 35,
-                height: 25,
-                speed: 4 + Math.random() * 2 // Velocidade variável
-            });
+        createHitEffect(hitPigeon.x, hitPigeon.y, earned, hitPigeon.isGolden);
+      } else {
+        streak = 0;
+        combo = 1;
+        popups.push({
+          x: pos.x,
+          y: pos.y - 8,
+          text: "ERROU!",
+          alpha: 0.9,
+          color: "#ef476f"
+        });
+      }
+
+      updateHud();
+    });
+
+    function update(dt) {
+      for (const c of clouds) {
+        c.x += c.speed * dt;
+        if (c.x - 90 > canvas.width) {
+          c.x = -90;
+        }
+      }
+
+      for (let i = feathers.length - 1; i >= 0; i--) {
+        const f = feathers[i];
+        f.x += f.vx * dt;
+        f.y += f.vy * dt;
+        f.vy += 240 * dt;
+        f.rot += f.vRot * dt;
+        f.alpha -= dt * 1.1;
+        if (f.alpha <= 0) feathers.splice(i, 1);
+      }
+
+      for (let i = popups.length - 1; i >= 0; i--) {
+        const pop = popups[i];
+        pop.y -= 42 * dt;
+        pop.alpha -= dt * 1.25;
+        if (pop.alpha <= 0) popups.splice(i, 1);
+      }
+
+      if (pointer.recoil > 0) {
+        pointer.recoil = Math.max(0, pointer.recoil - dt * 6);
+      }
+
+      if (!isRunning) return;
+
+      timeLeft -= dt;
+      countdownTimer += dt;
+      if (countdownTimer >= 0.1) {
+        countdownTimer = 0;
+        updateHud();
+      }
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        updateHud();
+        endGame();
+        return;
+      }
+
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnPigeon();
+        const difficultyFactor = Math.max(0.35, timeLeft / GAME_DURATION);
+        spawnTimer = 0.42 + difficultyFactor * 0.55;
+      }
+
+      for (let i = pigeons.length - 1; i >= 0; i--) {
+        const p = pigeons[i];
+        p.x += p.vx * dt;
+
+        if (p.zone === "sky") {
+          p.y += p.vy * dt;
+          if (p.y < 45 || p.y > HORIZON_Y - 25) p.vy *= -1;
+          p.wingPhase += dt * 15;
+        } else {
+          p.hopTimer += dt * 5.5;
+          const hop = Math.max(0, Math.sin(p.hopTimer)) * 12;
+          p.y = p.baseY - hop;
+          p.wingPhase += dt * 4;
         }
 
-        // Atualizar posições
-        function update() {
-            if (isGameOver) return;
+        const outOfBounds =
+          (p.vx > 0 && p.x > canvas.width + 70) ||
+          (p.vx < 0 && p.x < -70);
 
-            // Gravidade e movimento do jogador
-            player.speedY += player.gravity;
-            player.y += player.speedY;
-
-            // Limites da tela (chão e teto)
-            if (player.y + player.height > canvas.height) {
-                player.y = canvas.height - player.height;
-                isGameOver = true;
-            }
-            if (player.y < 0) {
-                player.y = 0;
-                player.speedY = 0;
-            }
-
-            // Gerenciar Pássaros
-            if (frameCount % 90 === 0) { // Cria um pássaro a cada 90 quadros
-                spawnBird();
-            }
-
-            for (let i = birds.length - 1; i >= 0; i--) {
-                birds[i].x -= birds[i].speed;
-
-                // Colisão com o jogador
-                if (
-                    player.x < birds[i].x + birds[i].width &&
-                    player.x + player.width > birds[i].x &&
-                    player.y < birds[i].y + birds[i].height &&
-                    player.y + player.height > birds[i].y
-                ) {
-                    isGameOver = true;
-                }
-
-                // Remover pássaros que saíram da tela e somar pontos
-                if (birds[i].x + birds[i].width < 0) {
-                    birds.splice(i, 1);
-                    score += 10;
-                }
-            }
-
-            frameCount++;
+        if (outOfBounds) {
+          pigeons.splice(i, 1);
         }
+      }
+    }
 
-        // Desenhar elementos na tela
-        function draw() {
-            // Limpar tela
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function drawBackground() {
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+      skyGrad.addColorStop(0, "#3a86ff");
+      skyGrad.addColorStop(1, "#bde0fe");
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, canvas.width, HORIZON_Y);
 
-            // Desenhar Jogador (Avião / Personagem simples)
-            ctx.fillStyle = "#ffcc00";
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-            // Detalhe da asa
-            ctx.fillStyle = "#ff4444";
-            ctx.fillRect(player.x + 10, player.y - 5, 15, 8);
+      ctx.fillStyle = "rgba(255, 243, 176, 0.9)";
+      ctx.beginPath();
+      ctx.arc(760, 85, 36, 0, Math.PI * 2);
+      ctx.fill();
 
-            // Desenhar Pássaros
-            ctx.fillStyle = "#333333";
-            for (let i = 0; i < birds.length; i++) {
-                ctx.fillRect(birds[i].x, birds[i].y, birds[i].width, birds[i].height);
-            }
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      for (const c of clouds) {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.scale(c.scale, c.scale);
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.arc(22, -6, 28, 0, Math.PI * 2);
+        ctx.arc(46, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
-            // Placar
-            ctx.fillStyle = "white";
-            ctx.font = "20px Arial";
-            ctx.fillText("Pontos: " + score, 20, 35);
+      const groundGrad = ctx.createLinearGradient(0, HORIZON_Y, 0, canvas.height);
+      groundGrad.addColorStop(0, "#52b788");
+      groundGrad.addColorStop(1, "#2d6a4f");
+      ctx.fillStyle = groundGrad;
+      ctx.fillRect(0, HORIZON_Y, canvas.width, canvas.height - HORIZON_Y);
 
-            // Tela de Game Over
-            if (isGameOver) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#40916c";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, HORIZON_Y);
+      ctx.lineTo(canvas.width, HORIZON_Y);
+      ctx.stroke();
+    }
 
-                ctx.fillStyle = "white";
-                ctx.font = "30px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText("FIM DE JOGO", canvas.width / 2, canvas.height / 2 - 20);
-                
-                ctx.font = "16px Arial";
-                ctx.fillText("Clique ou aperte Espaço para Reiniciar", canvas.width / 2, canvas.height / 2 + 20);
-                ctx.textAlign = "left"; // Reseta o alinhamento
-            }
-        }
+    function drawPigeon(p) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      if (p.vx < 0) {
+        ctx.scale(-1, 1);
+      }
 
-        // Loop principal do jogo
-        function loop() {
-            update();
-            draw();
-            if (!isGameOver) {
-                requestAnimationFrame(loop);
-            }
-        }
+      if (p.zone === "ground") {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.beginPath();
+        ctx.ellipse(0, p.baseY - p.y + 12, 18, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-        // Iniciar o jogo pela primeira vez
-        loop();
-    </script>
+      const bodyColor = p.isGolden ? "#ffd166" : "#8d99ae";
+      const wingColor = p.isGolden ? "#f4a261" : "#6c757d";
+
+      ctx.fillStyle = wingColor;
+      ctx.beginPath();
+      ctx.moveTo(-14, 2);
+      ctx.lineTo(-28, -5);
+      ctx.lineTo(-26, 7);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = bodyColor;
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 17, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(13, -7, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#f77f00";
+      ctx.beginPath();
+      ctx.moveTo(20, -8);
+      ctx.lineTo(27, -5);
+      ctx.lineTo(20, -3);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = "#111";
+      ctx.beginPath();
+      ctx.arc(15, -9, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      const flap = Math.sin(p.wingPhase) * 11;
+      ctx.fillStyle = wingColor;
+      ctx.beginPath();
+      ctx.moveTo(-6, 0);
+      ctx.quadraticCurveTo(2, -16 + flap, 10, 1);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawCrosshair() {
+      if (!pointer.showCrosshair || !isRunning) return;
+      const spread = 14 + pointer.recoil * 8;
+
+      ctx.save();
+      ctx.translate(pointer.x, pointer.y);
+      ctx.strokeStyle = "#ff2a55";
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, spread, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const len = 7;
+      ctx.beginPath();
+      ctx.moveTo(-spread - len, 0);
+      ctx.lineTo(-spread + 3, 0);
+      ctx.moveTo(spread - 3, 0);
+      ctx.lineTo(spread + len, 0);
+      ctx.moveTo(0, -spread - len);
+      ctx.lineTo(0, -spread + 3);
+      ctx.moveTo(0, spread - 3);
+      ctx.lineTo(0, spread + len);
+      ctx.stroke();
+
+      ctx.fillStyle = "#ff2a55";
+      ctx.beginPath();
+      ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawEffects() {
+      for (const f of feathers) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, f.alpha);
+        ctx.translate(f.x, f.y);
+        ctx.rotate(f.rot);
+        ctx.fillStyle = f.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, f.size, f.size * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      for (const pop of popups) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, pop.alpha);
+        ctx.font = "bold 16px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = pop.color;
+        ctx.fillText(pop.text, pop.x, pop.y);
+        ctx.restore();
+      }
+    }
+
+    function render() {
+      drawBackground();
+      const sorted = [...pigeons].sort((a, b) => a.y - b.y);
+      for (const p of sorted) {
+        drawPigeon(p);
+      }
+      drawEffects();
+      drawCrosshair();
+    }
+
+    function loop(timestamp) {
+      const dt = Math.min(0.05, (timestamp - lastTimestamp) / 1000);
+      lastTimestamp = timestamp;
+      update(dt);
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    updateHud();
+    requestAnimationFrame(loop);
+  </script>
 </body>
 </html>
